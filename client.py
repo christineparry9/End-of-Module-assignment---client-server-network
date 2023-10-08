@@ -1,74 +1,65 @@
 import socket
-import json
+import pickle
 import os
+import json
+import xml.etree.ElementTree as ET
+from cryptography.fernet import Fernet
 
-class Client:
+# Function to serialize dictionary based on format
+def serialize_dict(data_dict, serialization_format):
+    if serialization_format == "binary":
+        return pickle.dumps(data_dict)
+    elif serialization_format == "json":
+        return json.dumps(data_dict).encode()
+    elif serialization_format == "xml":
+        root = ET.Element("data")
+        for key, value in data_dict.items():
+            element = ET.SubElement(root, key)
+            element.text = str(value)
+        return ET.tostring(root)
+    else:
+        raise ValueError("Invalid serialization format")
 
-    def __init__(self):
-        # Initialize socket
-        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        #client_socket.connect((host, port))
+def start_client():
+    # Initialize socket
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_socket.connect(('localhost', 12345))
 
-    def connect_to_server(self, host, port):
-        try:    
-            self.client_socket.connect((host, port))
-        except:
-            return "not connected"
-        return "connected"
+    # Create and populate a dictionary
+    data_dict = {'name': 'Christine', 'age': 35, 'city': 'London'}
 
-    def send_dictionary(self, data_dict):
-        # Create and populate a dictionary
-        #data_dict = {'name': 'Christine', 'age': 35, 'city': 'London'}
+    # User can set pickling format to binary, JSON, or XML
+    serialization_format = input("Enter serialization format (binary/json/xml): ").lower()
 
-        # Serialize the dictionary
-        data = json.dumps(data_dict)
-        data = data.encode("utf-8")
+    try:
+        # Serialize the dictionary based on user's choice
+        serialized_data = serialize_dict(data_dict, serialization_format)
 
         # Send the serialized dictionary to the server
-        try:
-            self.client_socket.sendall(data)
+        client_socket.sendall(serialized_data)
+        print(f"Dictionary has been sent in {serialization_format} format")
 
-            print("Dictionary has been sent")
-        except:
-            return False
-        
-        return True
+        # Get the text file to send
+        file = open('sample_file.txt', 'rb')
 
-    def send_file(self, file_path):
+        # Get the size of the text file
+        size = os.path.getsize('sample_file.txt')
 
-        #get teh txt file to send
-        file = open(file_path, 'rb')
+        # Transmit file name and size to the receiver
+        client_socket.send("received_file.txt".encode())
+        client_socket.send(str(size).encode())
 
-        #get the sze of the txt file
-        size = os.path.getsize(file_path)
-
-        #transmit file name and size to the receiver
-        # client_socket.send("received_file.txt".encode())
-        # client_socket.send(str(size).encode())
-
-        #send all data to receiver
+        # Send all data to receiver
         data = file.read()
-        self.client_socket.sendall(data)
+        client_socket.sendall(data)
 
         print("File has been sent.")
-        return True
-    #    client_socket.close()
 
-            # Create and populate a text file
-        # with open('sample_file.txt', 'w') as f:
-        #     f.write('Hello, this is a sample file content.')
+        client_socket.close()
 
+    except ValueError as e:
+        print(f"Error: {e}")
+        client_socket.close()
 
-        # Read and send the text file
-        # with open('sample_file.txt', 'rb') as f:
-        #     while True:
-        #         file_data = f.read(1024)
-        #         if not file_data:
-        #             break
-        #         client_socket.sendall(file_data)
-
-#if __name__ == "__main__":
-#    client1 = start_client('localhost', 99999)
-#    data_dict = {'name': 'Christine', 'age': 35, 'city': 'London'}
-#    result1 = send_dictionary(client1, data_dict)
-#    result2 = send_file(client1, "sample_file.txt")
+if __name__ == "__main__":
+    start_client()
