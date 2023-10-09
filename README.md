@@ -44,5 +44,5 @@ Python version and libraries (as specified in \`requirements.txt\`) are
 available. - Run server before client to ensure the connection can be
 established. - Always ensure that the server and client are using the
 same encryption key if using the encryption option. - The sample text
-file (\`sample_file.txt\`) must be in the same directory as the client
+file (\`example.txt\`) must be in the same directory as the client
 script.
