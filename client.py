@@ -3,13 +3,14 @@ import pickle
 import os
 import json
 import xml.etree.ElementTree as ET
-
+from cryptography.fernet import Fernet
 
 class Client:
     def __init__(self, host='localhost', port=12345):
         self.host = host
         self.port = port
 
+    @staticmethod
     def serialize_dict(data_dict, serialization_format):
         if serialization_format == "binary":
             return pickle.dumps(data_dict)
@@ -20,7 +21,6 @@ class Client:
             for key, value in data_dict.items():
                 element = ET.SubElement(root, key)
                 element.text = str(value)
-            # Ensure XML is encoded to bytes before sending
             return ET.tostring(root, encoding="utf-8")
         else:
             raise ValueError("Invalid serialization format")
@@ -30,32 +30,33 @@ class Client:
         client_socket.connect((self.host, self.port))
 
         data_dict = {'name': 'Christine', 'age': 35, 'city': 'London'}
-
         serialization_format = input("Enter serialization format (binary/json/xml): ").lower()
+
+        # Use a pre-shared key for Fernet encryption
+        key = b'6WkZxGZxaFNba2sPXg8mbIgXxhjdw1iIo6DgymmqT_Q='
+        cipher_suite = Fernet(key)
 
         try:
             serialized_data = Client.serialize_dict(data_dict, serialization_format)
-             # Send the serialized dictionary to the server
             client_socket.sendall(serialization_format.ljust(1024).encode())
             client_socket.sendall(serialized_data)
-            print(f"Dictionary has been sent in {serialization_format} format")
 
-            # Transmit file name and size to the receiver
             file_name = 'example.txt'
-            file_size = os.path.getsize(file_name)
+
+            # Encrypt the file
+            with open(file_name, 'rb') as file:
+                encrypted_file_data = cipher_suite.encrypt(file.read())
+            print("encrypting txt file to send...")
+            encrypted_file_size = len(encrypted_file_data)
 
             client_socket.sendall(file_name.ljust(1024).encode())
-            client_socket.sendall(str(file_size).ljust(1024).encode())
+            client_socket.sendall(str(encrypted_file_size).ljust(1024).encode())
+            client_socket.sendall(encrypted_file_data)
 
-            # Send file data to the receiver
-            with open(file_name, 'rb') as file:
-                client_socket.sendall(file.read())
-
-            print("File has been sent.")
+            print("sent encrypted txt file")
 
         except ValueError as e:
             print(f"Error: {e}")
-
         finally:
             client_socket.close()
 

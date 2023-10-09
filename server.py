@@ -2,15 +2,14 @@ import socket
 import pickle
 import json
 import xml.etree.ElementTree as ET
+from cryptography.fernet import Fernet
 
-# Function to deserialize based on format
 def deserialize_data(data, serialization_format):
     if serialization_format == "binary":
         return pickle.loads(data)
     elif serialization_format == "json":
         return json.loads(data.decode())
     elif serialization_format == "xml":
-        # Ensure data is decoded to a string before parsing as XML
         root = ET.fromstring(data.decode("utf-8"))
         data_dict = {}
         for element in root:
@@ -28,52 +27,40 @@ def start_server():
     conn, addr = server_socket.accept()
     print(f"Connection received from {addr}")
 
-    try:
-        # Receive the serialization format from the client
-        serialization_format = conn.recv(1024).decode().strip()
+    key = b'6WkZxGZxaFNba2sPXg8mbIgXxhjdw1iIo6DgymmqT_Q='
+    cipher_suite = Fernet(key)
+    file_content = b""
 
-        # Receive and deserialize dictionary from client
+    try:
+        serialization_format = conn.recv(1024).decode().strip()
         data = conn.recv(1024)
         received_dict = deserialize_data(data, serialization_format)
         print(f"Received dictionary in {serialization_format} format: {received_dict}")
 
-        # Receive file name and size
         received_file_name = conn.recv(1024).decode().strip()
         received_file_size = int(conn.recv(1024).decode().strip())
 
-        # Initialize a bytes variable to store the file content in case we want to print it
-        file_content = b""
+        while received_file_size > 0:
+            data = conn.recv(min(received_file_size, 1024))
+            file_content += data
+            received_file_size -= len(data)
 
-        # Receive and handle text file
+        decrypted_file_content = cipher_suite.decrypt(file_content)
+
         with open(received_file_name, 'wb') as f:
-            while received_file_size > 0:
-                data = conn.recv(min(received_file_size, 1024))
-                print(f"Received chunk size: {len(data)} bytes")  # Debugging line
-                f.write(data)
-                file_content += data
-                received_file_size -= len(data)
+            f.write(decrypted_file_content)
 
-        print("File has been received.")
-
-
-        # Ask the user if they want to print the file content
         user_input = input("Do you want to print file contents to the screen? (yes/no): ")
-        if user_input.lower().strip() == 'yes' and file_content:
+        if user_input.lower().strip() == 'yes' and decrypted_file_content:
             try:
-                # Attempt to decode and print the file content
                 print("File content:")
-                print(file_content.decode("utf-8"))
+                print(decrypted_file_content.decode("utf-8"))
             except UnicodeDecodeError:
                 print("Cannot decode binary file to text.")
-        elif not file_content:
+        elif not decrypted_file_content:
             print("No file content to print.")
-
-
-
-
     except ValueError as e:
         print(f"Error: {e}")
-
     finally:
         conn.close()
 

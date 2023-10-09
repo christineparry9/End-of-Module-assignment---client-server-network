@@ -26,6 +26,7 @@ This repository contains a basic application demonstrating client-server communi
 
 - Python 3.x
 - Basic understanding of socket programming.
+- install required from requirements.txt
 
 ## How to Use
 
